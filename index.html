@@ -2,361 +2,309 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Image Detector</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- TFJS + Teachable Machine -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.21.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            color: #333;
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{
+            font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+            background:linear-gradient(135deg,#667eea,#764ba2);
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:20px;
         }
-        .container {
-            max-width: 900px;
-            width: 100%;
-            background: white;
-            border-radius: 25px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
-            overflow: hidden;
+        .container{
+            max-width:900px;width:100%;
+            background:#fff;border-radius:20px;
+            box-shadow:0 20px 40px rgba(0,0,0,0.2);
+            overflow:hidden;
         }
-        header {
-            background: linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #48dbfb 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
+        header{
+            background:linear-gradient(135deg,#ff6b6b,#feca57,#48dbfb);
+            color:#fff;text-align:center;padding:30px;
         }
-        header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-        .welcome { font-size: 1.2em; opacity: 0.95; }
-        .main-section {
-            padding: 40px;
-            text-align: center;
-            display: none;
+        header h1{font-size:2.2rem;margin-bottom:8px}
+        .section{padding:25px}
+        .btn{
+            display:inline-block;
+            border:none;
+            border-radius:10px;
+            padding:12px 24px;
+            font-size:1rem;
+            font-weight:600;
+            cursor:pointer;
+            color:#fff;
+            background:linear-gradient(135deg,#4f46e5,#7c3aed);
+            transition:transform .2s,box-shadow .2s,opacity .2s;
         }
-        .btn {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: white;
-            border: none;
-            padding: 20px 50px;
-            border-radius: 15px;
-            font-size: 20px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            width: 100%;
-            max-width: 350px;
-            margin: 15px auto;
-            display: block;
+        .btn:disabled{opacity:.6;cursor:not-allowed}
+        .btn:hover:not(:disabled){
+            transform:translateY(-2px);
+            box-shadow:0 10px 25px rgba(79,70,229,0.4);
         }
-        .btn:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 35px rgba(79,70,229,0.4);
+        .status{
+            margin-top:15px;
+            padding:10px 14px;
+            border-radius:10px;
+            font-size:.9rem;
+            text-align:center;
+            display:none;
         }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-        .status {
-            padding: 20px;
-            border-radius: 15px;
-            margin: 20px 0;
-            font-weight: 600;
-            font-size: 1.1em;
-            display: none;
+        .status.loading{background:#fef3c7;color:#92400e}
+        .status.success{background:#dcfce7;color:#166534}
+        .grid{
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:20px;
+            margin-top:20px;
         }
-        .status.loading {
-            background: #fef3c7;
-            color: #92400e;
-            animation: pulse 1.5s infinite;
+        .card{
+            padding:18px;
+            border-radius:15px;
+            background:#f1f5f9;
+            box-shadow:0 10px 25px rgba(0,0,0,0.08);
+            text-align:center;
         }
-        .status.success {
-            background: #dcfce7;
-            color: #166534;
+        .card-title{font-weight:700;margin-bottom:12px}
+        .view-box{
+            width:100%;max-width:320px;height:260px;
+            margin:0 auto 12px;
+            border-radius:15px;
+            overflow:hidden;
+            background:#e5e7eb;
+            display:flex;align-items:center;justify-content:center;
+            color:#6b7280;font-size:.9rem;
         }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
-        .inputs-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin: 30px 0;
+        .view-box canvas,
+        .view-box img{width:100%;height:100%;object-fit:cover}
+        .file-wrapper{position:relative;overflow:hidden;display:inline-block}
+        .file-wrapper input[type=file]{
+            position:absolute;left:0;top:0;
+            opacity:0;width:100%;height:100%;cursor:pointer;
         }
-        .input-card {
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-            text-align: center;
+        .predict-btn{
+            margin-top:15px;
+            width:100%;
+            max-width:260px;
+            background:linear-gradient(135deg,#10b981,#059669);
         }
-        .input-title {
-            font-size: 1.4em;
-            font-weight: 700;
-            margin-bottom: 20px;
-            color: #374151;
+        .results{margin-top:20px;display:none}
+        .results-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+            gap:15px;
+            margin-top:10px;
         }
-        .camera-area, .upload-area {
-            width: 350px;
-            height: 350px;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-            margin: 0 auto 20px;
-            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2em;
-            color: #6b7280;
+        .result-card{
+            background:#fff;
+            border-radius:14px;
+            padding:16px;
+            box-shadow:0 8px 20px rgba(0,0,0,0.08);
+            text-align:center;
         }
-        .camera-area canvas,
-        .upload-area canvas,
-        .upload-area img { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; }
-        .predict-btn {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            grid-column: 1 / -1;
-            font-size: 22px;
-            padding: 25px;
+        .result-label{font-weight:700;margin-bottom:8px}
+        .result-prob{font-size:1.8rem;font-weight:800;margin-bottom:8px;color:#4f46e5}
+        .bar{
+            width:100%;height:8px;border-radius:6px;
+            background:#e5e7eb;overflow:hidden;
         }
-        .results-section {
-            padding: 40px;
-            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-            display: none;
+        .bar-fill{
+            height:100%;
+            background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981);
+            width:0;transition:width .6s ease;
         }
-        .results-header h3 {
-            font-size: 2.2em;
-            color: #1e293b;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .predictions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 25px;
-        }
-        .prediction-card {
-            background: white;
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-        .prediction-card:hover { transform: translateY(-10px); box-shadow: 0 30px 60px rgba(0,0,0,0.15); }
-        .pred-label {
-            font-size: 1.5em;
-            font-weight: 800;
-            margin-bottom: 15px;
-            color: #1e293b;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .pred-prob {
-            font-size: 3.5em;
-            font-weight: bold;
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 20px;
-        }
-        .confidence-bar {
-            width: 100%;
-            height: 15px;
-            background: #e2e8f0;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .confidence-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981);
-            border-radius: 10px;
-            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .file-input-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: block;
-            width: 100%;
-        }
-        .file-input-wrapper input[type=file] {
-            position: absolute;
-            left: -9999px;
-        }
-        @media (max-width: 768px) {
-            .inputs-grid { grid-template-columns: 1fr; gap: 20px; }
-            header h1 { font-size: 2em; }
-            .camera-area, .upload-area { width: 280px; height: 280px; }
+        @media(max-width:768px){
+            .grid{grid-template-columns:1fr}
+            header h1{font-size:1.7rem}
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🧠 AI Image Detector</h1>
-            <p class="welcome">Real vs AI-Generated Images in Real-Time</p>
-        </header>
+<div class="container">
+    <header>
+        <h1>AI Image Detector</h1>
+        <p>Classify real vs AI-generated images</p>
+    </header>
 
-        <section class="main-section" id="welcomeSection">
-            <button class="btn" onclick="startDetection()">🚀 Launch Detector</button>
-            <div id="statusMsg" class="status"></div>
-        </section>
+    <div class="section">
+        <button id="initBtn" class="btn">🚀 Start Detector</button>
+        <div id="status" class="status"></div>
 
-        <section class="main-section" id="inputsSection">
-            <div class="inputs-grid">
-                <div class="input-card">
-                    <div class="input-title">📹 Live Camera</div>
-                    <div id="cameraArea" class="camera-area">Click to activate camera</div>
-                    <button class="btn" onclick="toggleCamera()">▶️ Start Camera</button>
+        <div id="ioSection" style="display:none;">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">📷 Webcam</div>
+                    <div id="camBox" class="view-box">Camera not started</div>
+                    <button id="camBtn" class="btn" type="button">Start Camera</button>
                 </div>
-                <div class="input-card">
-                    <div class="input-title">🖼️ Upload Photo</div>
-                    <div id="uploadArea" class="upload-area">Drop image here or click upload</div>
-                    <div class="file-input-wrapper">
-                        <input type="file" id="fileInput" accept="image/*" onchange="loadImage(event)">
-                        <button class="btn">📁 Choose Image</button>
+
+                <div class="card">
+                    <div class="card-title">🖼️ Upload Image</div>
+                    <div id="imgBox" class="view-box">No image selected</div>
+                    <div class="file-wrapper">
+                        <button class="btn" type="button">Choose Image</button>
+                        <input id="fileInput" type="file" accept="image/*">
                     </div>
                 </div>
             </div>
-            <button class="btn predict-btn" id="predictBtn" onclick="runPrediction()" disabled>🔮 Analyze Image</button>
-        </section>
 
-        <section class="results-section" id="resultsSection">
-            <div class="results-header">
-                <h3>🎯 Detection Results</h3>
+            <div style="text-align:center;">
+                <button id="predictBtn" class="btn predict-btn" type="button" disabled>
+                    🔮 Classify
+                </button>
             </div>
-            <div class="predictions" id="resultsGrid"></div>
-        </section>
+
+            <div id="results" class="results">
+                <h3 style="text-align:center;">Results</h3>
+                <div id="resultsGrid" class="results-grid"></div>
+            </div>
+        </div>
     </div>
+</div>
 
-    <script>
-        let model = null;
-        let webcam = null;
-        let isModelReady = false;
-        let isCameraActive = false;
-        const MODEL_URL = 'https://teachablemachine.withgoogle.com/models/94tkMGHCu/';
+<script>
+    // ----- CONFIG -----
+    const MODEL_URL_BASE = "https://teachablemachine.withgoogle.com/models/94tkMGHCu/"; // your model
 
-        const welcomeSection = document.getElementById('welcomeSection');
-        const inputsSection = document.getElementById('inputsSection');
-        inputsSection.style.display = 'block';
-        const resultsSection = document.getElementById('resultsSection');
-        const predictBtn = document.getElementById('predictBtn');
-        const statusMsg = document.getElementById('statusMsg');
-        const resultsGrid = document.getElementById('resultsGrid');
+    // ----- STATE -----
+    let model = null;
+    let webcam = null;
+    let modelReady = false;
+    let webcamOn = false;
+    let uploadedCanvas = null;
 
-        async function startDetection() {
-            statusMsg.textContent = 'Loading AI brain...';
-            statusMsg.className = 'status loading';
-            statusMsg.style.display = 'block';
+    // ----- DOM -----
+    const initBtn      = document.getElementById("initBtn");
+    const statusEl     = document.getElementById("status");
+    const ioSection    = document.getElementById("ioSection");
+    const camBox       = document.getElementById("camBox");
+    const camBtn       = document.getElementById("camBtn");
+    const fileInput    = document.getElementById("fileInput");
+    const imgBox       = document.getElementById("imgBox");
+    const predictBtn   = document.getElementById("predictBtn");
+    const resultsEl    = document.getElementById("results");
+    const resultsGrid  = document.getElementById("resultsGrid");
 
-            try {
-                model = await tmImage.load(
-                    MODEL_URL + 'model.json',
-                    MODEL_URL + 'metadata.json'
-                );
-                
-                isModelReady = true;
-                statusMsg.textContent = '✅ AI Detector Ready!';
-                statusMsg.className = 'status success';
-                welcomeSection.style.display = 'none';
-                predictBtn.disabled = false;
-                
-                setTimeout(() => statusMsg.style.display = 'none', 2000);
-            } catch (e) {
-                statusMsg.textContent = '⚠️ Connection issue. Retry?';
-                statusMsg.className = 'status loading';
-            }
+    // ----- HELPERS -----
+    function setStatus(msg, type){
+        statusEl.textContent = msg;
+        statusEl.className = "status " + type;
+        statusEl.style.display = "block";
+    }
+
+    // ----- INIT MODEL -----
+    async function initModel(){
+        try{
+            setStatus("Loading model...", "loading");
+            const modelURL    = MODEL_URL_BASE + "model.json";
+            const metadataURL = MODEL_URL_BASE + "metadata.json";
+            model = await tmImage.load(modelURL, metadataURL);  // tmImage API [web:12]
+            modelReady = true;
+            setStatus("Model ready!", "success");
+            ioSection.style.display = "block";
+            predictBtn.disabled = false;
+        }catch(err){
+            console.error(err);
+            setStatus("Failed to load model. Check internet and retry.", "loading");
+        }
+    }
+
+    // ----- WEBCAM -----
+    async function toggleWebcam(){
+        if(!modelReady){
+            setStatus("Initialize model first.", "loading");
+            return;
+        }
+        if(!webcamOn){
+            webcam = new tmImage.Webcam(320, 260, true);
+            await webcam.setup();
+            await webcam.play();
+            camBox.innerHTML = "";
+            camBox.appendChild(webcam.canvas);
+            webcamOn = true;
+            camBtn.textContent = "Stop Camera";
+            window.requestAnimationFrame(webcamLoop);
+        }else{
+            await webcam.stop();
+            camBox.innerHTML = "Camera not started";
+            webcamOn = false;
+            camBtn.textContent = "Start Camera";
+        }
+    }
+
+    async function webcamLoop(){
+        if(webcamOn && webcam && modelReady){
+            webcam.update();
+            await predict("webcam");
+            window.requestAnimationFrame(webcamLoop);
+        }
+    }
+
+    // ----- IMAGE UPLOAD -----
+    fileInput.addEventListener("change", e => {
+        const file = e.target.files[0];
+        if(!file) return;
+
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width  = 320;
+            canvas.height = 260;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            imgBox.innerHTML = "";
+            imgBox.appendChild(canvas);
+            uploadedCanvas = canvas;
+            predictBtn.disabled = !modelReady;
+        };
+        const objectURL = window.URL.createObjectURL(file); // safe alias [web:25][web:30]
+        img.src = objectURL;
+    });
+
+    // ----- PREDICTION -----
+    async function predict(source){
+        if(!modelReady || !model) return;
+
+        let inputEl = null;
+        if(source === "webcam" && webcamOn && webcam){
+            inputEl = webcam.canvas;
+        }else if(uploadedCanvas){
+            inputEl = uploadedCanvas;
+        }else{
+            return;
         }
 
-        async function toggleCamera() {
-            const cameraArea = document.getElementById('cameraArea');
-            
-            if (!isCameraActive) {
-                webcam = new tmImage.Webcam(350, 350, true);
-                await webcam.setup(); 
-                await webcam.play();
-                cameraArea.innerHTML = '';
-                cameraArea.appendChild(webcam.canvas);
-                
-                document.querySelector('button[onclick="toggleCamera()"]').textContent = '⏹️ Stop Camera';
-                isCameraActive = true;
-                
-                loopPrediction();
-            } else {
-                webcam.stop();
-                cameraArea.innerHTML = 'Click to activate camera';
-                document.querySelector('button[onclick="toggleCamera()"]').textContent = '▶️ Start Camera';
-                isCameraActive = false;
-            }
-        }
+        const preds = await model.predict(inputEl); // can take HTMLCanvasElement [web:12]
+        showResults(preds);
+    }
 
-        async function loopPrediction() {
-            if (isCameraActive && webcam && isModelReady) {
-                webcam.update();
-                await runPrediction();
-                requestAnimationFrame(loopPrediction);
-            }
-        }
+    function showResults(preds){
+        resultsGrid.innerHTML = "";
+        resultsEl.style.display = "block";
 
-        function loadImage(event) {
-            const file = event.target.files[0];
-            const uploadArea = document.getElementById('uploadArea');
-            
-            if (file) {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 350;
-                    canvas.height = 350;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, 350, 350);
-                    uploadArea.innerHTML = '';
-                    uploadArea.appendChild(canvas);
-                    predictBtn.disabled = false;
-                };
-                img.src = URL.createObjectURL(file);
-            }
-        }
+        preds.forEach(p => {
+            const prob = (p.probability * 100).toFixed(1);
+            const card = document.createElement("div");
+            card.className = "result-card";
+            card.innerHTML = `
+                <div class="result-label">${p.className}</div>
+                <div class="result-prob">${prob}%</div>
+                <div class="bar"><div class="bar-fill" style="width:${prob}%"></div></div>
+            `;
+            resultsGrid.appendChild(card);
+        });
+    }
 
-        async function runPrediction() {
-            if (!isModelReady || !model) return;
-
-            let imageElement;
-            if (isCameraActive && webcam) {
-                imageElement = webcam.canvas;
-            } else {
-                imageElement = document.querySelector('#uploadArea canvas') || 
-                              document.querySelector('#cameraArea canvas');
-            }
-            
-            if (!imageElement) return;
-
-            const predictions = await model.predict(imageElement);
-            displayResults(predictions);
-        }
-
-        function displayResults(predictions) {
-            resultsGrid.innerHTML = '';
-            resultsSection.style.display = 'block';
-
-            predictions.forEach(pred => {
-                const prob = (pred.probability * 100).toFixed(1);
-                const barWidth = `${pred.probability * 100}%`;
-
-                const card = document.createElement('div');
-                card.className = 'prediction-card';
-                card.innerHTML = `
-                    <div class="pred-label">${pred.className}</div>
-                    <div class="pred-prob">${prob}%</div>
-                    <div class="confidence-bar">
-                        <div class="confidence-fill" style="width: ${barWidth}"></div>
-                    </div>
-                `;
-                resultsGrid.appendChild(card);
-            });
-        }
-    </script>
+    // ----- EVENTS -----
+    initBtn.onclick    = initModel;
+    camBtn.onclick     = toggleWebcam;
+    predictBtn.onclick = () => predict("upload");
+</script>
 </body>
 </html>
