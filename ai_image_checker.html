@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI vs Real Image Checker</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      width: 100%;
+      min-height: 100vh;
+      background: #0b1020;
+      color: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      width: 380px;
+      max-width: 95vw;
+      padding: 18px 20px 20px;
+      border-radius: 20px;
+      background: radial-gradient(circle at top left, #020617, #020617 40%, #0b1120 100%);
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, #38bdf8, #a855f7);
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 14px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .btn {
+      position: relative;
+      flex: 1;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: white;
+      box-shadow: 0 8px 18px rgba(59, 130, 246, 0.35);
+    }
+
+    .btn.secondary {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #1f2937;
+    }
+
+    .btn.analyze {
+      width: 100%;
+      margin-top: 6px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      font-weight: 600;
+      box-shadow: 0 8px 18px rgba(22, 163, 74, 0.35);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn:not(:disabled):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.7);
+    }
+
+    .preview-card {
+      margin-top: 4px;
+      border-radius: 16px;
+      border: 1px solid #1f2937;
+      background: radial-gradient(circle at top left, #1e293b, #020617);
+      padding: 10px;
+      text-align: center;
+      min-height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    #preview {
+      max-width: 100%;
+      max-height: 220px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    #placeholder {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .result-card {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: linear-gradient(
+        145deg,
+        rgba(34, 197, 94, 0.12),
+        rgba(8, 47, 73, 0.9)
+      );
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+
+    .result-card.hidden {
+      display: none;
+    }
+
+    .result-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #a7f3d0;
+      margin-bottom: 4px;
+    }
+
+    .result-text {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .confidence-text {
+      font-size: 12px;
+      color: #d1fae5;
+    }
+
+    .footer {
+      margin-top: 10px;
+      font-size: 10px;
+      color: #6b7280;
+      text-align: right;
+    }
+  </style>
+
+  <!-- Teachable Machine + TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.3/dist/teachablemachine-image.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">Image Authenticity</h1>
+    <p class="subtitle">Classify if an image is AI‑generated or real.</p>
+
+    <div class="button-row">
+      <label class="btn primary">
+        Upload Image
+        <input type="file" id="imageUpload" accept="image/*" hidden />
+      </label>
+      <button id="sampleBtn" class="btn secondary">
+        Load Sample
+      </button>
+    </div>
+
+    <div class="preview-card">
+      <img id="preview" src="" alt="Preview" />
+      <div id="placeholder">No image selected yet</div>
+    </div>
+
+    <button id="analyzeBtn" class="btn analyze" disabled>
+      Analyze Image
+    </button>
+
+    <div id="resultCard" class="result-card hidden">
+      <div class="result-label">Result</div>
+      <div id="resultText" class="result-text">—</div>
+      <div id="confidenceText" class="confidence-text">Confidence: —</div>
+    </div>
+
+    <p class="footer">Powered by Teachable Machine</p>
+  </div>
+
+  <script>
+    // -----------------------------
+    //  CONFIG: PUT YOUR MODEL URL
+    // -----------------------------
+    // Example: const MODEL_URL = "https://teachablemachine.withgoogle.com/models/XXXXXX/";
+    const MODEL_URL = "YOUR_TEACHABLE_MACHINE_MODEL_URL_HERE";
+
+    let model;
+    let maxPredictions = 0;
+    let isModelLoading = false;
+    let imageElement = null;
+
+    const uploadInput = document.getElementById("imageUpload");
+    const sampleBtn = document.getElementById("sampleBtn");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const previewImg = document.getElementById("preview");
+    const placeholder = document.getElementById("placeholder");
+    const resultCard = document.getElementById("resultCard");
+    const resultText = document.getElementById("resultText");
+    const confidenceText = document.getElementById("confidenceText");
+
+    // Load TM model
+    async function loadModel() {
+      if (model || isModelLoading) return;
+      if (!MODEL_URL || MODEL_URL.includes("YOUR_TEACHABLE_MACHINE_MODEL_URL_HERE")) {
+        alert("Please set MODEL_URL in the script to your Teachable Machine model URL.");
+        throw new Error("MODEL_URL not set");
+      }
+      isModelLoading = true;
+      const modelURL = MODEL_URL + "model.json";
+      const metadataURL = MODEL_URL + "metadata.json";
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+      isModelLoading = false;
+    }
+
+    // Handle local upload
+    uploadInput.addEventListener("change", event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        setPreviewImage(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Sample button: just loads a tiny sample placeholder from data URL
+    sampleBtn.addEventListener("click", () => {
+      // you can replace this with your own sample image URL
+      const sampleUrl = "https://picsum.photos/400";
+      setPreviewImage(sampleUrl);
+    });
+
+    function setPreviewImage(src) {
+      previewImg.src = src;
+      previewImg.style.display = "block";
+      placeholder.style.display = "none";
+      analyzeBtn.disabled = false;
+      resultCard.classList.add("hidden");
+    }
+
+    // Run inference
+    analyzeBtn.addEventListener("click", async () => {
+      if (!previewImg.src) return;
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = "Analyzing…";
+
+      try {
+        await loadModel();
+
+        if (!imageElement) {
+          imageElement = new Image();
+        }
+        imageElement.crossOrigin = "anonymous";
+        imageElement.src = previewImg.src;
+
+        await new Promise(resolve => {
+          if (imageElement.complete) resolve();
+          else imageElement.onload = resolve;
+        });
+
+        const predictions = await model.predict(imageElement);
+
+        let best = predictions[0];
+        for (let i = 1; i < predictions.length; i++) {
+          if (predictions[i].probability > best.probability) {
+            best = predictions[i];
+          }
+        }
+
+        const label = best.className;
+        const prob = best.probability;
+
+        // Adjust to YOUR class names from Teachable Machine
+        // e.g. "AI" and "Real"
+        let displayText;
+        if (label.toLowerCase().includes("ai")) {
+          displayText = "Likely AI‑generated";
+        } else if (label.toLowerCase().includes("real")) {
+          displayText = "Likely Real";
+        } else {
+          displayText = "Predicted: " + label;
+        }
+
+        resultCard.classList.remove("hidden");
+        resultText.textContent = displayText;
+        confidenceText.textContent = "Confidence: " + (prob * 100).toFixed(1) + "%";
+      } catch (err) {
+        console.error(err);
+        alert("Error running model. Check the console for details.");
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = "Analyze Image";
+      }
+    });
+  </script>
+</body>
+</html>
