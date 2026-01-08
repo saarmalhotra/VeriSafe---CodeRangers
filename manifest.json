@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "AI Image Detector - Real vs AI",
+  "version": "1.0",
+  "description": "Detect AI-generated vs real images using Teachable Machine",
+  "permissions": [
+    "camera"
+  ],
+  "host_permissions": [
+    "https://teachablemachine.withgoogle.com/*"
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "AI Image Detector"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
